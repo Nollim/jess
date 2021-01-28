@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+
+  httpd:
+    build:
+      context: ../../
+      dockerfile: config/docker_jh/dockerfiles/httpd/Dockerfile
+    volumes:
+      - ../../:/usr/local/apache2/htdocs
+    ports:
+      - 80
+    restart: "always"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.httpd.rule=Host(`$PROJECT_NAME.dd`)"
+
+  php:
+    build:
+      context: ../../
+      dockerfile: config/docker_jh/dockerfiles/php/Dockerfile
+    volumes:
+      - ../../:/var/www/html/
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      MYSQL_HOST: ${MYSQL_HOST}
+      ES_HOST: ${ES_HOST}
+      ENV_MODE: ${ENV_MODE}
+
+  mysql:
+    build:
+      context: ../../
+      dockerfile: config/docker_jh/dockerfiles/mysql/Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PROJECT_NAME}
+      MYSQL_DATABASE: ${PROJECT_NAME}
+      MYSQL_USER: ${PROJECT_NAME}
+      MYSQL_PASSWORD: ${PROJECT_NAME}
+    restart: always
+    volumes:
+      - /opt/mysql_data/${PROJECT_NAME}:/var/lib/mysql/
+      - ../../dumps:/docker-entrypoint-initdb.d
+    labels:
+      - "traefik.enable=false"
+
+  traefik:
+    image: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
